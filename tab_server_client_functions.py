@@ -6,37 +6,57 @@ import os
 from tableauhyperapi import HyperProcess, Connection, TableDefinition, SqlType, Telemetry, Inserter, CreateMode, TableName
 from tableauhyperapi import escape_string_literal
 import json
+from tableauserverclient import server
+
+from tableauserverclient.models import tableau_auth
 
 
 # Console
 def consolelog(console_string:str):
     print(f"\n{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}:\t{console_string}")
 
-credentials = open('credential.json').read()
-credentials = json.loads(credentials)
-
-# Setting Up Tableau Server Connection
 print('\n')
 print('#'*20+ ' TABLEAU EXPRESS CLIENT '+ '#'*20)
-username =  credentials['username']   #'abchakraborty'   #input('Your Username: ')
-password =  credentials['password']     #getpass.getpass('Password Please: ')
-server = credentials['server']
 
-consolelog('Signing in...')
-#Signing in to the Server
-tableau_auth = TSC.TableauAuth(username, password)
-server = TSC.Server(server, use_server_version=True)
+def login(username=None,password=None,server=None,email=None,credential_path='credential.json'):
+    if credential_path is not None:
+        try:
+            # Reading credentials from the json file
+            credentials = open(credential_path).read()
+            credentials = json.loads(credentials)
+            
+            # Setting Up Tableau Server Connection credentials from the credential file
+            username =  credentials['username']
+            password =  credentials['password']
+            server = credentials['server']
+            email = credentials['email']
+        except Exception as e:
+            return consolelog(f'Credentials could not be read because {e}')
+    else:
+        if username is None or password is None or server is None or email is None:
+            return consolelog(f'Incomplete credentials provided')
 
 
-# Adding a filter for user related records
-req_option = TSC.RequestOptions()
-req_option.filter.add(TSC.Filter(TSC.RequestOptions.Field.OwnerEmail,
-                                 TSC.RequestOptions.Operator.Equals,
-                                 credentials['email']))
+    consolelog('Signing in...')
+    #Signing in to the Server
+    tableau_auth = TSC.TableauAuth(username, password)
+    server = TSC.Server(server, use_server_version=True)
 
-consolelog('Logged in!')
-time.sleep(2)
 
+    # Adding a filter for user related records
+    req_option = TSC.RequestOptions()
+    req_option.filter.add(TSC.Filter(TSC.RequestOptions.Field.OwnerEmail,
+                                    TSC.RequestOptions.Operator.Equals,
+                                    email))
+
+    consolelog('Signed in!')
+    time.sleep(2)
+    return (tableau_auth,server,req_option)
+
+server_creds = login()
+tableau_auth = server_creds[0]
+server = server_creds[1]
+req_option = server_creds[2]
 
 def getviewdata(all_items):
 
