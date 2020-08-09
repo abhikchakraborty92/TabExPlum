@@ -645,3 +645,29 @@ def delete_tableau_data(source_name):
                 return consolelog(f"Source deletion failed because {str(e)}")
     else:
         return consolelog('No datasources found. Please enter a valid source name')
+
+
+def refresh_tableau_workbook(workbookname):
+    """[summary]
+    This function refreshes a tableau workbook
+    Args:
+        workbookname ([string]): Name of the tableau workbook to be refreshed
+    
+    Returns:
+        [type]: [Job Object to be queried later]
+    """
+
+
+    workbook_obj = get_item_obj(item_type='workbook',search_string=workbookname)
+
+    if workbook_obj is not None:
+        with server.auth.sign_in(tableau_auth):
+            try:
+                results = server.workbooks.refresh(workbook_obj)
+                time.sleep(1)
+                consolelog(f"Workbook: {results.name.upper()} has been refreshed")
+                return results
+            except Exception as e:
+                return consolelog(f"Source refresh failed because {str(e)}")
+    else:
+        return consolelog('No workbooks found. Please enter a valid workbook name')
