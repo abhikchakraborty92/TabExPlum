@@ -7,7 +7,6 @@ from tableauhyperapi import HyperProcess, Connection, TableDefinition, SqlType, 
 from tableauhyperapi import escape_string_literal
 import json
 from tableauserverclient import server
-
 from tableauserverclient.models import tableau_auth
 
 
@@ -15,10 +14,17 @@ from tableauserverclient.models import tableau_auth
 def consolelog(console_string:str):
     print(f"\n{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}:\t{console_string}")
 
-print('\n')
-print('#'*20+ ' TABLEAU EXPRESS CLIENT '+ '#'*20)
+def stringclean(stringval):
+    enemyvals = f"!@#$%^&*(){{}};:',./\\`~?+-| "
+    stringval = ['_' if char in enemyvals else char for char in stringval]
+    stringval = ''.join(stringval)
+    return stringval
 
-def login(username=None,password=None,server=None,email=None,credential_path='credential.json'):
+
+print('\n')
+print('#'*20+ ' TABLEAU EXPRESS PLUMBER '+ '#'*20)
+
+def login(username=None,password=None,svr=None,email=None,siteurl=None,credential_path='credential.json'):
     if credential_path is not None:
         try:
             # Reading credentials from the json file
@@ -26,30 +32,38 @@ def login(username=None,password=None,server=None,email=None,credential_path='cr
             credentials = json.loads(credentials)
             
             # Setting Up Tableau Server Connection credentials from the credential file
-            username =  credentials['username']
-            password =  credentials['password']
-            server = credentials['server']
-            email = credentials['email']
+            username =  credentials.get('username')
+            password =  credentials.get('password')
+            svr = credentials.get('server')
+            email = credentials.get('email')
+            siteurl = credentials.get('sitename')
         except Exception as e:
             return consolelog(f'Credentials could not be read because {e}')
+            exit()
     else:
-        if username is None or password is None or server is None or email is None:
+        if username is None or password is None or svr is None or email is None:
             return consolelog(f'Incomplete credentials provided')
+            exit()
 
+    try:
+        consolelog('Signing in...')
+        
+        #Signing in to the Server
+        tableau_auth = TSC.TableauAuth(username=username, password=password,site=siteurl)
+        server = TSC.Server(svr)
+        server.use_server_version()
 
-    consolelog('Signing in...')
-    #Signing in to the Server
-    tableau_auth = TSC.TableauAuth(username, password)
-    server = TSC.Server(server, use_server_version=True)
-
-
-    # Adding a filter for user related records
-    req_option = TSC.RequestOptions()
-    req_option.filter.add(TSC.Filter(TSC.RequestOptions.Field.OwnerEmail,
-                                    TSC.RequestOptions.Operator.Equals,
-                                    email))
-
-    consolelog('Signed in!')
+        # Adding a filter for user related records
+        req_option = TSC.RequestOptions()
+        req_option.filter.add(TSC.Filter(TSC.RequestOptions.Field.OwnerEmail,
+                                        TSC.RequestOptions.Operator.Equals,
+                                        email))
+        server.auth.sign_in(tableau_auth)
+        consolelog('Signed in!')
+    except Exception as e:
+        consolelog(f'Login failed because {e}')
+        exit()
+    
     time.sleep(2)
     return (tableau_auth,server,req_option)
 
@@ -166,23 +180,26 @@ def getitemdetails(item_type=None,conditions=req_option):
 
     consolelog(f'Data requested for the tableau server item: {item_type}')
     time.sleep(1)
+    itemtable = pd.DataFrame()
     consolelog('Fetching data...')
     with server.auth.sign_in(tableau_auth):
-        
-        if item_type.lower() == 'project':
-            all_items, pagination_item = server.projects.get()
-            itemtable = getprojectdata(all_items)
-        elif item_type.lower() == 'workbook':
-            all_items, pagination_item = server.workbooks.get(conditions)
-            itemtable = getworkbookdata(all_items)
-        elif item_type.lower() == 'view':
-            all_items, pagination_item = server.views.get(conditions)
-            itemtable = getviewdata(all_items)
-        elif item_type.lower() == 'datasource':
-            all_items, pagination_item = server.datasources.get(conditions)
-            itemtable = getdatasourcedata(all_items)
-        else:
-            return None
+        try:
+            if item_type.lower() == 'project':
+                all_items, pagination_item = server.projects.get()
+                itemtable = getprojectdata(all_items)
+            elif item_type.lower() == 'workbook':
+                all_items, pagination_item = server.workbooks.get(conditions)
+                itemtable = getworkbookdata(all_items)
+            elif item_type.lower() == 'view':
+                all_items, pagination_item = server.views.get(conditions)
+                itemtable = getviewdata(all_items)
+            elif item_type.lower() == 'datasource':
+                all_items, pagination_item = server.datasources.get(conditions)
+                itemtable = getdatasourcedata(all_items)
+            else:
+                return itemtable
+        except Exception as e:
+            return consolelog(f'Operation failed because {e}')
     
     consolelog('Data Fetch completed')
     return itemtable
@@ -249,7 +266,7 @@ def get_directory(workbookname,filepath,filename):
     
     if os.path.exists(filepath):
         consolelog(f'{filepath} exists. Generating fullpath...')
-        filepath = os.path.join(filepath,workbookname)
+        filepath = os.path.join(filepath,stringclean(workbookname))
         if os.path.exists(filepath)==False:
             os.mkdir(filepath)
 
@@ -257,7 +274,7 @@ def get_directory(workbookname,filepath,filename):
     else:
         consolelog(f"{filepath} doesn't exist. Generating fullpath...")
         os.mkdir(filepath)
-        filepath = os.path.join(filepath,workbookname)
+        filepath = os.path.join(filepath,stringclean(workbookname))
         os.mkdir(filepath)
         fullpath = os.path.join(filepath,filename)
     consolelog(f'Filepath: {fullpath}')
@@ -277,7 +294,7 @@ def getviewmedia(view_obj,filepath,workbookname,viewname,fileformat):
         try:
             server.views.populate_image(view_obj)
             consolelog('Fetching Directory...')
-            filename = f'{viewname}.png'
+            filename = f'{stringclean(viewname)}.png'
             fullpath = get_directory(workbookname,filepath,filename) 
             consolelog(f'Writing {fileformat}...')
             with open(fullpath, 'wb') as f:
@@ -289,11 +306,24 @@ def getviewmedia(view_obj,filepath,workbookname,viewname,fileformat):
         try:
             server.views.populate_pdf(view_obj)
             consolelog('Fetching Directory...')
-            filename = f'{viewname}.pdf'
+            filename = f'{stringclean(viewname)}.pdf'
             fullpath = get_directory(workbookname,filepath,filename)
             consolelog(f'Writing {fileformat}...')
             with open(fullpath, 'wb') as f:
                 f.write(view_obj.pdf)
+                consolelog(f'{fileformat} download completed at {fullpath}')
+        except EnvironmentError as e:
+            consolelog(f'ERROR: \t {str(e)}')
+            return None
+    elif fileformat.lower() == 'csv':
+        try:
+            server.views.populate_csv(view_obj)
+            consolelog('Fetching Directory...')
+            filename = f'{stringclean(viewname)}.csv'
+            fullpath = get_directory(workbookname,filepath,filename)
+            consolelog(f'Writing {fileformat}...')
+            with open(fullpath, 'wb') as f:
+                f.write(b''.join(view_obj.csv))
                 consolelog(f'{fileformat} download completed at {fullpath}')
         except EnvironmentError as e:
             consolelog(f'ERROR: \t {str(e)}')
@@ -325,7 +355,10 @@ def downloadview(workbookname,viewname=None,conditions=req_option,filepath=None,
 
     time.sleep(2)
     try:
-        workbook_id = get_item_obj(item_type='workbook',search_string=workbookname).id
+        try:
+            workbook_id = get_item_obj(item_type='workbook',search_string=workbookname).id
+        except:
+            return consolelog('No workbook found. Exiting...')
         consolelog(f'Workbook ID for the workbook is {workbook_id}')
         with server.auth.sign_in(tableau_auth):
             workbook_obj = server.workbooks.get_by_id(workbook_id)
