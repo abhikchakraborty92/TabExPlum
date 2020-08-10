@@ -15,7 +15,7 @@ def consolelog(console_string:str):
     print(f"\n{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}:\t{console_string}")
 
 def stringclean(stringval):
-    enemyvals = f"!@#$%^&*(){{}};:',./\\`~?+-| "
+    enemyvals = f"!@#$%^&*(){{}};:',./\\`~?+-| " # Symbols to be replaced with a dash
     stringval = ['_' if char in enemyvals else char for char in stringval]
     stringval = ''.join(stringval)
     return stringval
