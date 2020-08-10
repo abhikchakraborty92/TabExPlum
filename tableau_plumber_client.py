@@ -58,6 +58,7 @@ def login(username=None,password=None,svr=None,email=None,siteurl=None,credentia
         req_option.filter.add(TSC.Filter(TSC.RequestOptions.Field.OwnerEmail,
                                         TSC.RequestOptions.Operator.Equals,
                                         email))
+        # Running the login function to check if the credentials are okay
         server.auth.sign_in(tableau_auth)
         consolelog('Signed in!')
     except Exception as e:
@@ -67,10 +68,12 @@ def login(username=None,password=None,svr=None,email=None,siteurl=None,credentia
     time.sleep(2)
     return (tableau_auth,server,req_option)
 
-server_creds = login()
-tableau_auth = server_creds[0]
-server = server_creds[1]
-req_option = server_creds[2]
+
+# Under this section, we run the login function once and gather the filter, auth object and server from it
+server_creds = login() # Running the login function
+tableau_auth = server_creds[0]  # Auth Variable
+server = server_creds[1] # Server Variable
+req_option = server_creds[2] # Filter to get relevant item values
 
 def getviewdata(all_items):
 
