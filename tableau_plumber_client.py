@@ -343,7 +343,7 @@ def downloadview(workbookname,viewname=None,conditions=req_option,filepath=None,
 
     """
     [summary]
-    This is a powerful function that downloads the view/views of a tableau workbook in PDF or PNG format
+    This is a powerful function that downloads the view/views of a tableau workbook in PDF or PNG or CSV format
 
     Args:
     
